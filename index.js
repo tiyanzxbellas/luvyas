@@ -1,6 +1,6 @@
-import fetch from 'node-fetch';
-import fs from 'fs';
-import path from 'path';
+const fetch = require('node-fetch');
+const fs = require('fs');
+const path = require('path');
 
 const BASE = 'https://v4.luvyaa.co';
 const OUTPUT = '/tmp/scrape';
@@ -40,7 +40,7 @@ async function getHTML(url) {
   return res.text();
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -50,45 +50,44 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { path } = req.query;
-  const urlPath = Array.isArray(path) ? path.join('/') : (path || '');
-
+  // Parse URL
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const pathname = url.pathname.replace('/api/', '');
+  
   try {
     let response;
 
-    if (urlPath.startsWith('list')) {
-      const params = new URLSearchParams(req.url.split('?')[1] || '');
-      const type = params.get('type') || 'manga';
-      const status = params.get('status') || '';
-      const genre = params.get('genre') || '';
-      const page = parseInt(params.get('page')) || 1;
+    if (pathname === 'list') {
+      const type = url.searchParams.get('type') || 'manga';
+      const status = url.searchParams.get('status') || '';
+      const genre = url.searchParams.get('genre') || '';
+      const page = parseInt(url.searchParams.get('page')) || 1;
       response = await getList(type, { status, genre, order: 'update', page });
     } 
-    else if (urlPath.startsWith('search')) {
-      const params = new URLSearchParams(req.url.split('?')[1] || '');
-      const query = params.get('q') || '';
+    else if (pathname === 'search') {
+      const query = url.searchParams.get('q') || '';
       response = await search(query);
     }
-    else if (urlPath.startsWith('detail/')) {
-      const slug = urlPath.replace('detail/', '');
+    else if (pathname.startsWith('detail/')) {
+      const slug = pathname.replace('detail/', '');
       response = await getDetail(slug);
     }
-    else if (urlPath.startsWith('chapter/')) {
-      const parts = urlPath.replace('chapter/', '').split('/');
+    else if (pathname.startsWith('chapter/')) {
+      const parts = pathname.replace('chapter/', '').split('/');
       const slug = parts[0];
       const num = parseInt(parts[1]) || 1;
       response = await getChapter(slug, num);
     }
-    else if (urlPath.startsWith('download/')) {
-      const parts = urlPath.replace('download/', '').split('/');
+    else if (pathname.startsWith('download/')) {
+      const parts = pathname.replace('download/', '').split('/');
       const slug = parts[0];
       const num = parseInt(parts[1]) || 1;
       response = await downloadChapter(slug, num, OUTPUT);
     }
-    else if (urlPath === 'genres') {
+    else if (pathname === 'genres') {
       response = { total: Object.keys(GENRES).length, genres: GENRES };
     }
-    else if (urlPath === 'types') {
+    else if (pathname === 'types') {
       response = { types: TYPES, statuses: STATUSES, orders: ORDERS, totalGenres: Object.keys(GENRES).length };
     }
     else {
@@ -114,7 +113,7 @@ export default async function handler(req, res) {
   } catch (error) {
     res.status(500).json({ success: false, author: 'Nimzz', error: error.message });
   }
-}
+};
 
 async function getList(type = 'manga', filters = {}) {
   const { status = '', genre = '', order = 'update', page = 1 } = filters;
